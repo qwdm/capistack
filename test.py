@@ -7,33 +7,65 @@ import stack
 
 
 try:
-	N_TESTS = int(sys.argv[1])
+    N_TESTS = int(sys.argv[1])
 except IndexError:
-	N_TESTS = 10
+    N_TESTS = 1000
 
-def leak_test():
+
+def pushup(stackobj, numtests, maxheight):
+    for i in xrange(numtests):
+         for j in xrange(maxheight):
+              stackobj.push(i)
+         for j in xrange(maxheight):
+              stackobj.pop()
+
+
+def LEAK_TEST():
+
+    def leak_test():
         s = stack.Stack()
-        for i in xrange(N_TESTS):
-                for j in xrange(100):
-                        s.push(i)
-                for j in xrange(100):
-                        s.pop()
+        pushup(s, N_TESTS, 100)
+            
+    test = Process(target=leak_test, args=())
+    test.start()
 
-test = Process(target=leak_test, args=())
-test.start()
+    print "Test Process PID: %s" % test.pid
+    while test.is_alive():
+            with open("/proc/%s/status" % test.pid) as f:
+                    line = [line for line in f.readlines() 
+                                 if "VmSize" in line][0]
+                    print line
+            time.sleep(1)
+            
+    print 'test ends'
 
-#watch = Process(target=os.system, args=("watch -n 1 free -h",))
-#watch.start()
 
-print "Test Process PID: %s" % test.pid
-while test.is_alive():
-        with open("/proc/%s/status" % test.pid) as f:
-                line = [line for line in f.readlines() 
-                             if "VmSize" in line][0]
-                print line
-        time.sleep(1)
-        
-        
+def PERFOMANCE_TEST():
+    def timeit(func):
+        def _(*args, **kwargs):
+            t0 = time.time()
+            func(*args, **kwargs)
+            return time.time() - t0
+        return _
 
-#test.join()
-print 'test ends'
+
+    numt = 10
+    maxh = 10000000
+
+    @timeit
+    def pystack_test():
+        s = type("PyStack", (list, ), {})()
+        s.push = s.append
+        pushup(s, numt, maxh)
+
+    @timeit
+    def mystack_test():
+        s = stack.Stack()
+        pushup(s, numt, maxh)
+
+    print "pystack: %s" % pystack_test()
+    print "mystack: %s" % mystack_test()
+
+
+if __name__ == '__main__':
+    PERFOMANCE_TEST()
